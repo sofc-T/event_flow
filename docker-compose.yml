@@ -1,0 +1,83 @@
+services:
+  # Zookeeper is required by Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - flow-net
+
+  # Kafka broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - flow-net
+
+  # PostgreSQL
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: flow
+      POSTGRES_PASSWORD: flow123
+      POSTGRES_DB: flowdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - flow-net
+
+  # Ingest microservice
+  ingest:
+    build:
+      context: .
+      dockerfile: src/service/ingest/Dockerfile
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: ingest_events
+      DB_HOST: db
+      DB_USER: flow
+      DB_PASS: flow123
+      DB_NAME: flowdb
+    depends_on:
+      - kafka
+      - db
+    ports:
+      - "8080:8080"
+    networks:
+      - flow-net
+
+  # Process microservice
+  process:
+    build:
+      context: .
+      dockerfile: src/service/process/Dockerfile
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: ingest_events
+      KAFKA_GROUP_ID: process_group
+      DB_HOST: db
+      DB_USER: flow
+      DB_PASS: flow123
+      DB_NAME: flowdb
+    depends_on:
+      - kafka
+      - db
+    networks:
+      - flow-net
+
+volumes:
+  pgdata:
+
+networks:
+  flow-net:
+    driver: bridge

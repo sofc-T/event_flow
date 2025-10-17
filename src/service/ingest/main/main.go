@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,10 +11,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sofc-t/event_flow/src/observability"
+	ingest "github.com/sofc-t/event_flow/src/service/ingest/api"
+	dto "github.com/sofc-t/event_flow/src/service/ingest/dto"
+	ingestService "github.com/sofc-t/event_flow/src/service/ingest/service"
 	"github.com/sofc-t/event_flow/src/service/kafka"
 	"go.uber.org/zap"
-	dto "github.com/sofc-t/event_flow/src/service/ingest/dto"
-	ingest "github.com/sofc-t/event_flow/src/service/ingest/api"
 )
 
 // Entry point for the ingest service
@@ -41,7 +41,7 @@ func main() {
 	defer publisher.Close()
 
 	// --- Setup CQRS Handlers ---
-	createHandler := &CreateIngestHandler{Publisher: publisher}
+	createHandler := &CreateIngestHandler{Publisher: publisher, IngestService: ingestService.New(publisher)}
 	getHandler := &GetIngestHandler{}
 	listHandler := &ListIngestsHandler{}
 
@@ -87,40 +87,19 @@ func main() {
 
 // CreateIngestHandler publishes ingest events to Kafka
 type CreateIngestHandler struct {
-	Publisher kafka.Publisher
+	Publisher     kafka.Publisher
+	IngestService *ingestService.Service
 }
 
 func (h *CreateIngestHandler) Handle(cmd *dto.IngestCommand) (bool, error) {
-	// Assign defaults
-	if cmd.ID == "" {
-		cmd.ID = uuid.New().String()
-	}
-	if cmd.Timestamp.IsZero() {
-		cmd.Timestamp = time.Now()
-	}
-	if cmd.Topic == "" {
-		cmd.Topic = "ingest_events"
-	}
+	logger := observability.Logger
 
-	data, err := json.Marshal(cmd)
+	success, err := h.IngestService.Create(context.Background(), *cmd)
 	if err != nil {
+		logger.Error("failed to create ingest", zap.Error(err))
 		return false, err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = h.Publisher.Publish(ctx, cmd.Topic, cmd.Source, data)
-	if err != nil {
-		return false, err
-	}
-
-	observability.Logger.Info("✅ Event published to Kafka",
-		zap.String("topic", cmd.Topic),
-		zap.String("id", cmd.ID),
-		zap.String("source", cmd.Source),
-	)
-	return true, nil
+	return success != nil, nil
 }
 
 // --------------------------------------------------------------------

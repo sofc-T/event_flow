@@ -73,6 +73,7 @@ func (i *IngestController) createIngest(ctx *gin.Context) {
 
 	// cmd.Timestamp = time.Now()
 
+	logger.Info("processing ingest command: sent to processor", zap.Any("cmd", cmd))
 	ok, err := i.createIngestHandler.Handle(&cmd)
 	if err != nil {
 		logger.Error("failed to handle ingest command", zap.Error(err))
@@ -85,6 +86,8 @@ func (i *IngestController) createIngest(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Ingest rejected"})
 		return
 	}
+
+
 
 	logger.Info("ingest created successfully", zap.Any("cmd", cmd))
 	ctx.JSON(http.StatusCreated, gin.H{"status": "success"})
