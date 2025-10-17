@@ -32,7 +32,7 @@ func NewSubscriber(cfg Config) (Subscriber, error) {
 		logger: logger,
 	}
 
-	logger.Info("✅ Kafka subscriber initialized",
+	logger.Info("Kafka subscriber initialized",
 		zap.Strings("brokers", cfg.Brokers),
 		zap.String("group_id", cfg.GroupID),
 	)
@@ -42,21 +42,21 @@ func NewSubscriber(cfg Config) (Subscriber, error) {
 // Subscribe consumes messages continuously.
 func (s *subscriber) Subscribe(ctx context.Context, topic string, handler MessageHandler) error {
 	s.reader.SetOffset(k.LastOffset)
-	s.logger.Info("📥 Subscribing to topic", zap.String("topic", topic))
+	s.logger.Info("Subscribing to topic", zap.String("topic", topic))
 
 	for {
 		msg, err := s.reader.ReadMessage(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
-				s.logger.Info("🛑 Subscription stopped", zap.String("topic", topic))
+				s.logger.Info(" Subscription stopped", zap.String("topic", topic))
 				return nil
 			}
-			s.logger.Error("⚠️ Failed to read message", zap.Error(err))
+			s.logger.Error(" Failed to read message", zap.Error(err))
 			continue
 		}
 
 		if err := handler(ctx, msg.Key, msg.Value); err != nil {
-			s.logger.Error("❌ Handler failed", zap.Error(err))
+			s.logger.Error(" Handler failed", zap.Error(err))
 		}
 	}
 }
