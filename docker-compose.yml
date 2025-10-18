@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # Zookeeper is required by Kafka
   zookeeper:
@@ -7,7 +9,7 @@ services:
     networks:
       - flow-net
 
-  # Kafka broker
+  # Kafka broker (CORRECTED CONFIGURATION)
   kafka:
     image: confluentinc/cp-kafka:7.5.1
     depends_on:
@@ -17,7 +19,10 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     networks:
       - flow-net
@@ -36,13 +41,14 @@ services:
     networks:
       - flow-net
 
-  # Ingest microservice
+  # Ingest microservice (UPDATED KAFKA_BROKERS)
   ingest:
     build:
       context: .
       dockerfile: src/service/ingest/Dockerfile
     environment:
-      KAFKA_BROKERS: kafka:9092
+      # 👇 Updated to use the internal Kafka listener port (29092) 👇
+      KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: ingest_events
       DB_HOST: db
       DB_USER: flow
@@ -56,13 +62,14 @@ services:
     networks:
       - flow-net
 
-  # Process microservice
+  # Process microservice (UPDATED KAFKA_BROKERS)
   process:
     build:
       context: .
       dockerfile: src/service/process/Dockerfile
     environment:
-      KAFKA_BROKERS: kafka:9092
+      # 👇 Updated to use the internal Kafka listener port (29092) 👇
+      KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: ingest_events
       KAFKA_GROUP_ID: process_group
       DB_HOST: db

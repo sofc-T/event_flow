@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strings" // Added to split the KAFKA_BROKERS string
 	"syscall"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Entry point for the ingest service
 func main() {
 	// --- Initialize Observability ---
 	ctx := context.Background()
@@ -29,9 +29,18 @@ func main() {
 	defer cancel()
 
 	// --- Setup Kafka Publisher ---
+	// Todo: conig from env
+	kafkaBrokersStr := os.Getenv("KAFKA_BROKERS")
+	if kafkaBrokersStr == "" {
+		kafkaBrokersStr = "kafka:29092" 
+		logger.Warn("KAFKA_BROKERS environment variable not set, using default", zap.String("default", kafkaBrokersStr))
+	}
+	// KAFKA_BROKERS is typically a comma-separated list
+	kafkaBrokers := strings.Split(kafkaBrokersStr, ",") 
+
 	kafkaCfg := kafka.Config{
-		Brokers:     []string{"localhost:9092"},
-		TopicPrefix: "ingest_events_",
+		Brokers:     kafkaBrokers, 
+		TopicPrefix: "ingest_events",
 		RequireTLS:  false,
 	}
 	publisher, err := kafka.NewPublisher(kafkaCfg)
@@ -40,14 +49,14 @@ func main() {
 	}
 	defer publisher.Close()
 
-	// --- Setup CQRS Handlers ---
-	createHandler := &CreateIngestHandler{Publisher: publisher, IngestService: ingestService.New(publisher)}
+	// --- Setup Ingest Service ---
+	ingestService := ingestService.New(publisher)
 	getHandler := &GetIngestHandler{}
 	listHandler := &ListIngestsHandler{}
 
 	// --- Setup Controller ---
 	controller := ingest.NewIngestController(ingest.Config{
-		CreateIngestHandler: createHandler,
+		CreateIngestHandler: ingestService,
 		GetIngestHandler:    getHandler,
 		ListIngestsHandler:  listHandler,
 	})
@@ -63,19 +72,19 @@ func main() {
 		addr:   ":8080",
 	}
 
-	go func() {
-		logger.Info("🚀 Ingest service started", zap.String("addr", srv.addr))
-		if err := srv.run(); err != nil {
+	go func(s *httpServer) {
+		logger.Info("Ingest service started", zap.String("addr", s.addr))
+		if err := s.run(); err != nil {
 			logger.Fatal("server crashed", zap.Error(err))
 		}
-	}()
+	}(srv)
 
 	// --- Graceful Shutdown ---
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh
 
-	logger.Info("🧹 Shutting down gracefully...")
+	logger.Info("Shutting down gracefully...")
 	cancel()
 	srv.shutdown(ctx)
 	logger.Sync()
@@ -85,22 +94,6 @@ func main() {
 // CQRS Command and Query Handlers
 // --------------------------------------------------------------------
 
-// CreateIngestHandler publishes ingest events to Kafka
-type CreateIngestHandler struct {
-	Publisher     kafka.Publisher
-	IngestService *ingestService.Service
-}
-
-func (h *CreateIngestHandler) Handle(cmd *dto.IngestCommand) (bool, error) {
-	logger := observability.Logger
-
-	success, err := h.IngestService.Create(context.Background(), *cmd)
-	if err != nil {
-		logger.Error("failed to create ingest", zap.Error(err))
-		return false, err
-	}
-	return success != nil, nil
-}
 
 // --------------------------------------------------------------------
 // Query Handlers (Mock Implementations)

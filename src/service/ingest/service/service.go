@@ -11,6 +11,7 @@ import (
 	kafka "github.com/sofc-t/event_flow/src/service/kafka"
 	dto "github.com/sofc-t/event_flow/src/service/ingest/dto"
 	"go.uber.org/zap"
+	icmd "github.com/sofc-t/event_flow/src/service/cqrs/command"
 )
 
 // Service handles ingestion commands and queries for the API endpoints.
@@ -24,9 +25,13 @@ func New(pub kafka.Publisher) *Service {
 		publisher: pub,
 	}
 }
+// implements icmd.IHandler[*dto.IngestCommand, *dto.IngestResult]
 
-// Create publishes a new ingest command to Kafka.
-func (s *Service) Create(ctx context.Context, cmd dto.IngestCommand) (*dto.IngestResult, error) {
+var _ icmd.IHandler[*dto.IngestCommand, *dto.IngestResult] = &Service{}
+
+
+
+func (s *Service) Handle(cmd *dto.IngestCommand, ctx context.Context) (*dto.IngestResult, error) {
 	logger := observability.Logger.Ctx(ctx)
 
 	if cmd.ID == "" {

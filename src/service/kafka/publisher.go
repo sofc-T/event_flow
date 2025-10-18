@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 type publisher struct {
 	writer *kafka.Writer
 	logger *zap.Logger
@@ -45,6 +44,7 @@ func NewPublisher(cfg Config) (Publisher, error) {
 		AllowAutoTopicCreation: true,
 		RequiredAcks:           kafka.RequireAll,
 		Async:                  cfg.Async,
+		Topic:                  cfg.TopicPrefix + "default",
 	}
 
 	logger.Info("Kafka publisher initialized",

@@ -2,7 +2,7 @@ package ingest
 
 import (
 	"net/http"
-	// "time"
+	"time"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -20,14 +20,14 @@ import (
 // IngestController handles ingestion-related endpoints.
 type IngestController struct {
 	basecontroller.BaseController
-	createIngestHandler icmd.IHandler[*dto.IngestCommand, bool]
+	createIngestHandler icmd.IHandler[*dto.IngestCommand, *dto.IngestResult]
 	getIngestHandler    iqry.IHandler[uuid.UUID, *dto.IngestRecord]
 	listIngestsHandler  iqry.IHandler[int, []*dto.IngestRecord]
 }
 
 // Config holds the configuration dependencies for creating an IngestController.
 type Config struct {
-	CreateIngestHandler icmd.IHandler[*dto.IngestCommand, bool]
+	CreateIngestHandler icmd.IHandler[*dto.IngestCommand, *dto.IngestResult]
 	GetIngestHandler    iqry.IHandler[uuid.UUID, *dto.IngestRecord]
 	ListIngestsHandler  iqry.IHandler[int, []*dto.IngestRecord]
 }
@@ -44,7 +44,7 @@ func NewIngestController(config Config) *IngestController {
 // RegisterPublic registers open routes (no authentication required).
 func (i *IngestController) RegisterPublic(router *gin.RouterGroup) {
 	router = router.Group("/ingest")
-	router.POST("/", i.createIngest)
+	router.POST("", i.createIngest)
 	router.GET("/:id", i.getIngest)
 	router.GET("/page/:page", i.listIngests)
 }
@@ -71,17 +71,17 @@ func (i *IngestController) createIngest(ctx *gin.Context) {
 		return
 	}
 
-	// cmd.Timestamp = time.Now()
+	cmd.Timestamp = time.Now()
 
 	logger.Info("processing ingest command: sent to processor", zap.Any("cmd", cmd))
-	ok, err := i.createIngestHandler.Handle(&cmd)
+	ok, err := i.createIngestHandler.Handle(&cmd, ctx.Request.Context())
 	if err != nil {
 		logger.Error("failed to handle ingest command", zap.Error(err))
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process ingest"})
 		return
 	}
 
-	if !ok {
+	if ok == nil {
 		logger.Warn("ingest command failed validation", zap.Any("cmd", cmd))
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Ingest rejected"})
 		return

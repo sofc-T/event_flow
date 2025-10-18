@@ -31,7 +31,7 @@ type Config struct {
 
 func loadConfig() Config {
 	return Config{
-		KafkaBrokers: getenv("KAFKA_BROKERS", "localhost:9092"),
+		KafkaBrokers: getenv("KAFKA_BROKERS", "kafka:9092"),
 		KafkaTopic:   getenv("KAFKA_TOPIC", "ingest_events"),
 		KafkaGroupID: getenv("KAFKA_GROUP_ID", "process_group"),
 
@@ -83,7 +83,7 @@ func main() {
 	})
 	defer reader.Close()
 
-	log.Printf("✅ Kafka consumer ready on topic=%s", cfg.KafkaTopic)
+	log.Printf("✅ Kafka consumer ready on topic=%s, brokers=%s", cfg.KafkaTopic, cfg.KafkaBrokers)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

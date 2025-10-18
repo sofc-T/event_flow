@@ -5,6 +5,8 @@ It includes the `IHandler` interface for processing commands of any type and ret
 */
 package icmd
 
+import "context"
+
 // IHandler defines a generic interface for handling commands.
 //
 // Type Parameters:
@@ -13,5 +15,5 @@ package icmd
 type IHandler[Command any, Result any] interface {
 
 	// Handle processes the provided command and returns the result or an error.
-	Handle(command Command) (Result, error)
+	Handle(command Command, ctx context.Context) (Result, error)
 }
