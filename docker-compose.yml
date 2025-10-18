@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Zookeeper is required by Kafka
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.1
     environment:
@@ -47,7 +46,6 @@ services:
       context: .
       dockerfile: src/service/ingest/Dockerfile
     environment:
-      # 👇 Updated to use the internal Kafka listener port (29092) 👇
       KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: ingest_events
       DB_HOST: db
@@ -68,7 +66,6 @@ services:
       context: .
       dockerfile: src/service/process/Dockerfile
     environment:
-      # 👇 Updated to use the internal Kafka listener port (29092) 👇
       KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: ingest_events
       KAFKA_GROUP_ID: process_group
